@@ -13,24 +13,27 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Zip source code
-      run: zip -r hike.zip src/*
-
     - name: Set up AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: your-aws-region
+        aws-region: eu-west-1
 
-    - name: Create S3 bucket
+    - name: Check if S3 bucket stack exists
+      id: check-s3-stack
+      run: |
+        aws cloudformation describe-stacks --stack-name MyS3BucketStack > /dev/null 2>&1 || echo "::set-output name=stack_exists::false"
+      continue-on-error: true
+
+    - name: Create S3 bucket stack if it does not exist
+      if: steps.check-s3-stack.outputs.stack_exists == 'false'
       run: |
         aws cloudformation create-stack \
           --stack-name MyS3BucketStack \
-          --template-body file://cfn/s3-bucket-cfn.yml \
+          --template-body file://.github/cfn/s3-bucket-cfn.yml \
           --capabilities CAPABILITY_IAM \
-          --parameter-overrides \
-            S3BucketName=personaldevopsprojects
+          --parameters ParameterKey=S3BucketName,ParameterValue=personaldevopsprojects
 
     - name: Upload source code to S3
       run: |
@@ -40,8 +43,8 @@ jobs:
       run: |
         aws cloudformation deploy \
           --stack-name MyElasticBeanstalkStack \
-          --template-file cfn/elasticbeanstalk-cfn.yml \
+          --template-file .github/cfn/elasticbeanstalk-cfn.yml \
+          --capabilities CAPABILITY_IAM \
           --parameter-overrides \
             EnvironmentName=MyElasticBeanstalkEnvironment \
             S3Bucket=personaldevopsprojects
-          --capabilities CAPABILITY_IAM
