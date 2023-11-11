@@ -1,0 +1,47 @@
+name: Deploy to Elastic Beanstalk
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Zip source code
+      run: zip -r hike.zip src/*
+
+    - name: Set up AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: your-aws-region
+
+    - name: Create S3 bucket
+      run: |
+        aws cloudformation create-stack \
+          --stack-name MyS3BucketStack \
+          --template-body file://cfn/s3-bucket-cfn.yml \
+          --capabilities CAPABILITY_IAM \
+          --parameter-overrides \
+            S3BucketName=personaldevopsprojects
+
+    - name: Upload source code to S3
+      run: |
+        aws s3 cp hike.zip s3://personaldevopsprojects/node/hike.zip
+
+    - name: Deploy Elastic Beanstalk
+      run: |
+        aws cloudformation deploy \
+          --stack-name MyElasticBeanstalkStack \
+          --template-file cfn/elasticbeanstalk-cfn.yml \
+          --parameter-overrides \
+            EnvironmentName=MyElasticBeanstalkEnvironment \
+            S3Bucket=personaldevopsprojects
+          --capabilities CAPABILITY_IAM
