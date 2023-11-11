@@ -13,6 +13,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
+    - name: Zip source code
+      run: |
+        cd src
+        zip -r ../hike.zip *
+        cd ..
+
     - name: Set up AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
